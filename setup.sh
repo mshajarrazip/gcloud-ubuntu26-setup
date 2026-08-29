@@ -130,7 +130,21 @@ EOF
   else
     log "Adding ${USER} to the docker group"
     sudo usermod -aG docker "${USER}"
+    # `newgrp`/`sg` live in util-linux-extra on Ubuntu 24.04+ minimal/cloud
+    # images and are not guaranteed to be present.
+    apt_installed util-linux-extra || sudo apt-get install -y util-linux-extra
     echo "    Log out and back in (or run 'newgrp docker') for this to take effect."
+  fi
+
+  # Verify the non-root setup works. The group change isn't active in this
+  # shell yet, so fall back to `sg docker` to exercise it now.
+  log "Verifying 'docker run' without sudo"
+  if docker run --rm hello-world >/dev/null 2>&1 \
+     || sg docker -c 'docker run --rm hello-world' >/dev/null 2>&1; then
+    log "docker run hello-world: OK"
+  else
+    echo "    Could not run 'docker run hello-world' as ${USER} yet." >&2
+    echo "    Log out and back in (or run 'newgrp docker'), then retry." >&2
   fi
 }
 
